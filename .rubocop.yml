@@ -1,0 +1,89 @@
+# Linting is not decoration here: the rules below are the ones that would have
+# caught real defects in this codebase (shadowed associations, `Time.now`,
+# `find_by` where `find` was meant, unbounded `all`).
+plugins:
+  - rubocop-rails
+  - rubocop-rspec
+  - rubocop-rspec_rails
+  - rubocop-factory_bot
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  Exclude:
+    - 'bin/**/*'
+    - 'db/schema.rb'
+    - 'vendor/**/*'
+    - 'tmp/**/*'
+    - 'log/**/*'
+    # docs/captured holds verbatim transcripts and the throwaway script that
+    # produced one of them -- evidence, not application code.
+    - 'docs/**/*'
+    # Rails generated this file verbatim; it is configuration, not code we own.
+    - 'config/initializers/devise.rb'
+
+Rails:
+  Enabled: true
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  Exclude:
+    - 'config/**/*'
+    - 'db/**/*'
+
+Metrics/MethodLength:
+  Max: 15
+
+Metrics/AbcSize:
+  Max: 20
+
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'
+    - 'config/**/*'
+
+Layout/LineLength:
+  Max: 120
+
+# Request specs assert a status code and a body shape in the same example; that
+# is one behaviour, not several.
+RSpec/ExampleLength:
+  Max: 20
+
+RSpec/NestedGroups:
+  Max: 4
+
+# `should` reads correctly with shoulda-matchers one-liners.
+RSpec/NamedSubject:
+  Enabled: false
+
+# Explicit `type:` metadata documents what a spec file is at a glance, which is
+# worth more than the two words it costs.
+RSpecRails/InferredSpecType:
+  Enabled: false
+
+# `event1`/`event2` genuinely are interchangeable fixtures in the ordering specs.
+RSpec/IndexedLet:
+  Enabled: false
+
+# Migrations already committed are history; they are not rewritten for style.
+Style/Documentation:
+  Exclude:
+    - 'db/migrate/**/*'
+
+Rails/NotNullColumn:
+  Exclude:
+    - 'db/migrate/**/*'
+
+# The pagination specs need more rows than a page to prove the cap works.
+FactoryBot/ExcessiveCreateList:
+  Exclude:
+    - 'spec/requests/**/*'
+
+RSpec/MultipleExpectations:
+  Max: 8
+
+# Seeds are a console script; printing what they did is the point.
+Rails/Output:
+  Exclude:
+    - 'db/seeds.rb'
