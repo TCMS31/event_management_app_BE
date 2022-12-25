@@ -1,0 +1,14 @@
+en:
+  errors:
+    server: 'An error occurred'
+    not_authorized: 'You are not allowed to perform this action'
+    record_not_found: '%{model} not found'
+    missing_param: 'The following param is missing or the value is empty: %{param}'
+
+  activerecord:
+    errors:
+      models:
+        event_user:
+          attributes:
+            user_id:
+              taken: 'User can join the same event only once'
