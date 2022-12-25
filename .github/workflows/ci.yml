@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      RAILS_ENV: test
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5432'
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      # Not a real secret: the test environment needs a deterministic signing key.
+      DEVISE_JWT_SECRET_KEY: ci-only-signing-key-not-used-anywhere-else
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Prepare the database
+        run: bin/rails db:create db:schema:load
+
+      - name: Lint
+        run: bundle exec rubocop --parallel
+
+      - name: Test
+        run: bundle exec rspec
