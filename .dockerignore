@@ -1,0 +1,35 @@
+# See https://docs.docker.com/engine/reference/builder/#dockerignore-file
+
+/.git/
+/.github/
+/.bundle
+/vendor/bundle
+
+# Environment files and keys -- never bake a secret into a layer.
+/.env*
+!/.env.example
+/config/master.key
+/config/credentials/*.key
+
+# Logs, temp files and local state.
+/log/*
+!/log/.keep
+/tmp/*
+!/tmp/.keep
+/tmp/pids/*
+!/tmp/pids/.keep
+/storage/*
+!/storage/.keep
+/tmp/storage/*
+!/tmp/storage/.keep
+
+# Nothing below is needed at runtime.
+/spec/
+/docs/
+/coverage/
+.rspec
+.rubocop.yml
+README.md
+docker-compose.yml
+.DS_Store
+**/.DS_Store
