@@ -1,0 +1,30 @@
+Proof that the suite fails when the fixes are removed.
+
+A suite that cannot fail is worth nothing, so the two headline fixes were
+reverted, the suite re-run, and the fixes restored. Captured 2026-09-25.
+
+Step 1 -- baseline: the suite as it stands.
+$ bundle exec rspec
+122 examples, 0 failures
+
+Step 2 -- revert EventPolicy#update?/#destroy? to 'any signed-in user' and
+          re-introduce the shadowed has_many that dropped dependent: :destroy.
+$ bundle exec rspec
+122 examples, 10 failures
+Failed examples:
+
+rspec ./spec/models/user_spec.rb:21 # User relations owns the events it organises
+rspec ./spec/models/user_spec.rb:60 # User#destroy destroys the events the user organised
+rspec ./spec/policies/event_policy_spec.rb:27 # EventPolicy when the actor is a different signed-in user is expected not to be update
+rspec ./spec/policies/event_policy_spec.rb:28 # EventPolicy when the actor is a different signed-in user is expected not to be destroy
+rspec ./spec/requests/api/v1/events_authorization_spec.rb:26 # Api::V1::Events authorization PUT /api/v1/events/:id by a non-organizer is forbidden
+rspec ./spec/requests/api/v1/events_authorization_spec.rb:31 # Api::V1::Events authorization PUT /api/v1/events/:id by a non-organizer leaves the record untouched
+rspec ./spec/requests/api/v1/events_authorization_spec.rb:41 # Api::V1::Events authorization PATCH /api/v1/events/:id by a non-organizer is forbidden
+rspec ./spec/requests/api/v1/events_authorization_spec.rb:51 # Api::V1::Events authorization DELETE /api/v1/events/:id by a non-organizer is forbidden and destroys nothing
+rspec ./spec/requests/api/v1/events_authorization_spec.rb:67 # Api::V1::Events authorization a participant who is not the organizer still may not update the event they joined
+rspec ./spec/requests/api/v1/events_authorization_spec.rb:75 # Api::V1::Events authorization a participant who is not the organizer still may not delete the event they joined
+
+
+Step 3 -- restore both fixes.
+$ bundle exec rspec
+122 examples, 0 failures

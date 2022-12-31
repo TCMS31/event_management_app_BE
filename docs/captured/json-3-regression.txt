@@ -1,0 +1,35 @@
+Why the Gemfile pins json '~> 2.7'.
+
+Adding RuboCop to this project resolves json to 3.x. Rather than take that
+on trust, the unpinned bundle was built, booted and exercised. Captured
+2026-09-25 on Ruby 3.2.2 / Rails 7.1.2 / PostgreSQL 16.
+
+$ bundle update json
+Fetching json 3.0.2 (was 2.21.2)
+Installing json 3.0.2 (was 2.21.2) with native extensions
+
+The application still boots, and GET endpoints still answer:
+
+$ bin/rails server -p 8691
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8691/up
+200
+
+But every request carrying a JSON body fails:
+
+$ curl -s -i -X POST http://127.0.0.1:8691/login -H 'Content-Type: application/json' \
+       -d '{"user":{"email":"ada@example.com","password":"password123"}}'
+HTTP/1.1 500 Internal Server Error
+
+...with this in the server log:
+
+ActionDispatch::Http::Parameters::ParseError (Error occurred while parsing request parameters):
+
+The suite catches it too -- which it would not have done before this pass,
+because the original specs never posted a JSON body:
+
+$ bundle exec rspec
+122 examples, 42 failures
+
+Pinning json back to the 2.x line that Rails 7.1 is tested against restores
+all 122. Two lessons kept in the Gemfile comment: pin it, and boot the
+server and curl a real endpoint after any change to the bundle.

@@ -1,0 +1,220 @@
+Real transcript captured against a locally booted server:
+  bin/rails db:schema:load db:seed
+  bin/rails server -p 8690 -b 127.0.0.1        # RAILS_ENV=development
+Captured 2026-09-25 06:34:03Z. Every block below is the literal
+output of the command printed above it; only the bearer tokens are truncated.
+
+Seed data: users ada@example.com / grace@example.com / alan@example.com,
+password 'password123'; 6 events, 5 upcoming and 1 in the past.
+
+================================================================
+0. GET /up -- the health endpoint the container HEALTHCHECK probes
+================================================================
+
+$ curl -s -o /dev/null -w 'status: %{http_code}\n' http://127.0.0.1:8690/up
+status: 200
+
+
+================================================================
+1. An anonymous caller is refused
+================================================================
+
+$ curl -s -i http://127.0.0.1:8690/api/v1/events | sed -n '1p' ; curl -s http://127.0.0.1:8690/api/v1/events
+HTTP/1.1 401 Unauthorized
+You need to sign in or sign up before continuing.
+
+================================================================
+2. POST /signup
+================================================================
+
+$ curl -s -i -X POST http://127.0.0.1:8690/signup -H 'Content-Type: application/json' -d '{"user":{"name":"Marie","email":"marie.c@example.com","password":"password123"}}' | sed -n '1p;/^{/p'
+HTTP/1.1 200 OK
+{"status":{"code":200,"message":"Signed up successfully."},"data":{"id":4,"email":"marie.c@example.com","name":"Marie"}}
+
+================================================================
+3. POST /signup with an email that is already taken
+================================================================
+
+$ curl -s -i -X POST http://127.0.0.1:8690/signup -H 'Content-Type: application/json' -d '{"user":{"name":"Marie","email":"marie.c@example.com","password":"password123"}}' | sed -n '1p;/^{/p'
+HTTP/1.1 422 Unprocessable Content
+{"status":["Email has already been taken"]}
+
+================================================================
+4. POST /login -- the token arrives in the Authorization response header
+================================================================
+
+$ curl -s -D - -o /dev/null -X POST http://127.0.0.1:8690/login -H 'Content-Type: application/json' \
+       -d '{"user":{"email":"ada@example.com","password":"password123"}}'
+HTTP/1.1 200 OK
+authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjOWU1YjRiNy1hMDQwLTQ3ODQtYjMyNi03NzY2M2Y4Y
+{"status":{"code":200,"message":"Logged in successfully.","data":{"user":{"id":1,"email":"ada@ex
+
+
+================================================================
+5. POST /login with the wrong password issues no token
+================================================================
+
+$ curl -s -D - -o /dev/null -X POST http://127.0.0.1:8690/login -H 'Content-Type: application/json' -d '{"user":{"email":"ada@example.com","password":"wrong"}}' | tr -d '\r' | grep -icE '^authorization:' | sed 's/^/authorization headers returned: /' ; curl -s -o /dev/null -w 'status: %{http_code}\n' -X POST http://127.0.0.1:8690/login -H 'Content-Type: application/json' -d '{"user":{"email":"ada@example.com","password":"wrong"}}'
+authorization headers returned: 0
+status: 401
+
+
+================================================================
+6. GET /api/v1/events -- events Ada organises, with the pagination headers
+================================================================
+
+$ curl -s -D - -H "Authorization: $ADA" 'http://127.0.0.1:8690/api/v1/events?per_page=2' | tr -d '\r' | grep -iE '^(HTTP/|x-total-count|x-page|x-per-page)'
+HTTP/1.1 200 OK
+x-total-count: 2
+x-page: 1
+x-per-page: 2
+
+
+$ curl -s -H "Authorization: $ADA" 'http://127.0.0.1:8690/api/v1/events?per_page=2' | python3 -m json.tool
+[
+    {
+        "id": 4,
+        "name": "Testing Without Mocks",
+        "description": "Writing suites that fail for the right reasons.",
+        "date": "2026-10-23T06:34:03.001Z",
+        "location": "Bristol",
+        "organizer_id": 1
+    },
+    {
+        "id": 1,
+        "name": "Rails Performance Day",
+        "description": "A day of profiling, query plans and cache strategy.",
+        "date": "2026-10-02T06:34:02.994Z",
+        "location": "Manchester",
+        "organizer_id": 1
+    }
+]
+
+
+================================================================
+7. GET /api/v1/events/get_events -- upcoming events Ada has not joined or organised
+================================================================
+
+$ curl -s -H "Authorization: $ADA" http://127.0.0.1:8690/api/v1/events/get_events | python3 -c 'import json,sys; [print(e["id"], "|", e["name"], "|", e["date"][:10]) for e in json.load(sys.stdin)]'
+5 | Retro: Things We Shipped | 2026-10-30
+
+
+================================================================
+8. GET /api/v1/events/joined_events
+================================================================
+
+$ curl -s -H "Authorization: $ADA" http://127.0.0.1:8690/api/v1/events/joined_events | python3 -c 'import json,sys; [print(e["id"], "|", e["name"]) for e in json.load(sys.stdin)]'
+3 | API Design Clinic
+2 | PostgreSQL Indexing Workshop
+
+
+================================================================
+9. An empty list is 200 with [] -- it used to be 204 with a body Rack discarded
+================================================================
+
+$ curl -s -i -H "Authorization: $ADA" 'http://127.0.0.1:8690/api/v1/events?page=99' | sed -n '1p' ; curl -s -H "Authorization: $ADA" 'http://127.0.0.1:8690/api/v1/events?page=99'
+HTTP/1.1 200 OK
+[]
+
+================================================================
+10. POST /api/v1/events
+================================================================
+
+$ curl -s -i -X POST http://127.0.0.1:8690/api/v1/events -H "Authorization: $ADA" -H 'Content-Type: application/json' -d '{"event":{"name":"Zero Downtime Migrations","description":"Shipping schema changes without a maintenance window.","date":"2026-11-02T18:00:00Z","location":"York"}}' | sed -n '1p;/^{/p'
+HTTP/1.1 201 Created
+{"id":7,"name":"Zero Downtime Migrations","description":"Shipping schema changes without a maintenance window.","date":"2026-11-02T18:00:00.000Z","location":"York","organizer_id":1}
+
+================================================================
+11. POST /api/v1/events with invalid attributes
+================================================================
+
+$ curl -s -i -X POST http://127.0.0.1:8690/api/v1/events -H "Authorization: $ADA" -H 'Content-Type: application/json' -d '{"event":{"name":"","location":"York"}}' | sed -n '1p;/^{/p'
+HTTP/1.1 422 Unprocessable Content
+{"attributes_errors":{"name":["can't be blank"],"description":["can't be blank"],"date":["can't be blank"]}}
+
+================================================================
+12. AUTHORIZATION: Grace may not update an event Ada organises
+================================================================
+
+$ curl -s -i -X PUT http://127.0.0.1:8690/api/v1/events/7 -H "Authorization: $GRACE" -H 'Content-Type: application/json' -d '{"event":{"name":"Hijacked"}}' | sed -n '1p;/^{/p'
+HTTP/1.1 403 Forbidden
+{"errors":["You are not allowed to perform this action"]}
+
+$ curl -s -H "Authorization: $ADA" http://127.0.0.1:8690/api/v1/events/7 | python3 -c 'import json,sys; d=json.load(sys.stdin); print("name is still:", d["name"], "| organizer_id:", d["organizer_id"])'
+name is still: Zero Downtime Migrations | organizer_id: 1
+
+
+================================================================
+13. AUTHORIZATION: Grace may not delete it either
+================================================================
+
+$ curl -s -i -X DELETE http://127.0.0.1:8690/api/v1/events/7 -H "Authorization: $GRACE" | sed -n '1p;/^{/p'
+HTTP/1.1 403 Forbidden
+{"errors":["You are not allowed to perform this action"]}
+
+================================================================
+14. The organizer can update and delete their own event
+================================================================
+
+$ curl -s -i -X PUT http://127.0.0.1:8690/api/v1/events/7 -H "Authorization: $ADA" -H 'Content-Type: application/json' -d '{"event":{"location":"Newcastle"}}' | sed -n '1p;/^{/p'
+HTTP/1.1 200 OK
+{"id":7,"name":"Zero Downtime Migrations","description":"Shipping schema changes without a maintenance window.","date":"2026-11-02T18:00:00.000Z","location":"Newcastle","organizer_id":1}
+
+$ curl -s -o /dev/null -w 'DELETE by the organizer -> %{http_code}\n' -X DELETE http://127.0.0.1:8690/api/v1/events/7 -H "Authorization: $ADA"
+DELETE by the organizer -> 204
+
+
+================================================================
+15. A missing event is 404 with the standard envelope (it used to be 200)
+================================================================
+
+$ curl -s -i -H "Authorization: $ADA" http://127.0.0.1:8690/api/v1/events/999999 | sed -n '1p;/^{/p'
+HTTP/1.1 404 Not Found
+{"errors":["Event not found"]}
+
+================================================================
+16. POST /api/v1/events/add_user_to_events -- event_id in the query string
+================================================================
+
+$ curl -s -i -X POST "http://127.0.0.1:8690/api/v1/events/add_user_to_events?event_id=4" -H "Authorization: $GRACE" | sed -n '1p;/^{/p'
+HTTP/1.1 201 Created
+{"id":7,"user_id":2,"event_id":4}
+
+================================================================
+17. Joining twice is refused
+================================================================
+
+$ curl -s -i -X POST "http://127.0.0.1:8690/api/v1/events/add_user_to_events?event_id=4" -H "Authorization: $GRACE" | sed -n '1p;/^{/p'
+HTTP/1.1 422 Unprocessable Content
+{"attributes_errors":{"user_id":["User can join the same event only once"]}}
+
+================================================================
+18. Joining without event_id is 400 (it used to be 200 with the raw exception text)
+================================================================
+
+$ curl -s -i -X POST http://127.0.0.1:8690/api/v1/events/add_user_to_events -H "Authorization: $GRACE" | sed -n '1p;/^{/p'
+HTTP/1.1 400 Bad Request
+{"errors":["The following param is missing or the value is empty: event_id"]}
+
+================================================================
+19. DELETE /logout revokes the token
+================================================================
+
+$ curl -s -i -X DELETE http://127.0.0.1:8690/logout -H "Authorization: $GRACE" | sed -n '1p;/^{/p'
+HTTP/1.1 200 OK
+{"status":200,"message":"Logged out successfully."}
+
+$ curl -s -o /dev/null -w 'the revoked token on GET /api/v1/events -> %{http_code}\n' -H "Authorization: $GRACE" http://127.0.0.1:8690/api/v1/events
+the revoked token on GET /api/v1/events -> 401
+
+
+================================================================
+20. CORS -- the client can read the Authorization and pagination headers
+================================================================
+
+$ curl -s -D - -o /dev/null -H 'Origin: http://localhost:3001' http://127.0.0.1:8690/api/v1/events | tr -d '\r' | grep -i '^access-control'
+access-control-allow-origin: *
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD
+access-control-expose-headers: Authorization, X-Total-Count, X-Page, X-Per-Page
+access-control-max-age: 7200
+

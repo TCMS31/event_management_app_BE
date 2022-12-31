@@ -1,0 +1,21 @@
+Probe of the pristine repository at commit 3252cf5 ("Add deployment configurations").
+Exported with `git archive HEAD`, bundled against Ruby 3.2.2 and PostgreSQL 16,
+and run with `bundle exec rspec spec/requests/baseline_vulnerability_probe_spec.rb`.
+The probe spec is not part of the repository; it existed only to reproduce the
+defects listed in the README's "Design notes" before they were fixed.
+
+$ bundle exec rspec spec/requests/baseline_vulnerability_probe_spec.rb
+PROBE 1 cross-user UPDATE -> HTTP 200; name is now "Hijacked"; organizer_id 63 (owner 62, attacker 63)
+.PROBE 2 cross-user DELETE -> HTTP 204; Event.count is now 0
+.PROBE 3 GET missing event -> HTTP 200; body "\"Couldn't find Event with 'id'=999999\""
+.PROBE 4 user.destroy! -> RAISED ActiveRecord::InvalidForeignKey: PG::ForeignKeyViolation: ERROR:  update or delete on table "users" violates foreign key constraint "fk_rails_91125650cd" on table "events"
+DETAIL:  Key (id)=(67) is still referenced from table "events
+.PROBE 5 GET /api/v1/events (empty) -> HTTP 204; body ""; content-type nil
+.PROBE 6 join w/o event_id -> HTTP 200; body "\"param is missing or the value is empty: event_id\""
+.PROBE 7 self-join -> HTTP 201; EventUser.count 1
+.PROBE 8 GET /api/v1/events with 120 events -> returned 120 rows
+.
+
+Finished in 0.39461 seconds (files took 0.83992 seconds to load)
+8 examples, 0 failures
+
